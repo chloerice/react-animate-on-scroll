@@ -1,10 +1,10 @@
-import React, { Component } from "react";
-import throttle from "lodash.throttle";
-import PropTypes from "prop-types";
+import React, { Component } from 'react';
+import throttle from 'lodash.throttle';
+import PropTypes from 'prop-types';
 
 export default class ScrollAnimation extends Component {
   static posTop() {
-    if (typeof window.pageYOffset !== "undefined") {
+    if (typeof window.pageYOffset !== 'undefined') {
       return window.pageYOffset;
     } else if (document.documentElement.scrollTop) {
       return document.documentElement.scrollTop;
@@ -16,50 +16,64 @@ export default class ScrollAnimation extends Component {
 
   constructor(props) {
     super(props);
-    const initialHide = this.props.initiallyVisible ? "" : "hidden";
+    const initialHide = this.props.initiallyVisible ? '' : 'hidden';
     this.state = {
-      classes: "animated",
-      style: {"animationDuration": this.props.duration + "s", visibility: initialHide},
-      lastVisibility: {partially: false, completely: false},
+      classes: 'animated',
+      style: {
+        animationDuration: `${this.props.duration}s`,
+        visibility: initialHide
+      },
+      lastVisibility: {
+        partially: false,
+        completely: false
+      },
       timeouts: [],
       hasAnimated: false
     };
-    if (window && window.addEventListener) {
-      window.addEventListener("scroll", throttle(this.handleScroll.bind(this), 200));
-    }
+
+    this.isVisible = this.isVisible.bind(this);
     this.getClasses = this.getClasses.bind(this);
+    this.getStyle = this.getStyle.bind(this);
+    this.handleScroll = this.handleScroll.bind(this);
+
+    if (window && window.addEventListener) {
+      window.addEventListener('scroll', throttle(this.handleScroll, 200));
+    }
   }
 
   componentDidMount() {
-    this.setState({elementBottom: this.node.getBoundingClientRect().bottom + ScrollAnimation.posTop(),
-                 elementTop: this.node.getBoundingClientRect().top + ScrollAnimation.posTop()}, this.handleScroll);
+    this.setState({
+      elementBottom: this.node.getBoundingClientRect().bottom + ScrollAnimation.posTop(),
+      elementTop: this.node.getBoundingClientRect().top + ScrollAnimation.posTop()
+    }, this.handleScroll);
     this.handleScroll();
   }
 
   componentWillUnmount() {
     if (window && window.addEventListener) {
-      window.removeEventListener("scroll", this.handleScroll.bind(this));
+      window.removeEventListener('scroll', this.handleScroll);
     }
   }
 
   handleScroll() {
     const visible = this.isVisible();
     if (!visible.partially) {
-      this.state.timeouts.forEach(function(tid) {
+      this.state.timeouts.forEach(tid => {
         clearTimeout(tid);
-      })
+      });
     }
-    if (visible.completely !== this.state.lastVisibility.completely || visible.partially !== this.state.lastVisibility.partially) {
+    if (visible.completely !== this.state.lastVisibility.completely ||
+        visible.partially !== this.state.lastVisibility.partially) {
       const style = this.getStyle(visible);
       const classes = this.getClasses(visible);
       var that = this;
       if (visible.partially) {
-        var timeout = setTimeout(function() {
+        var timeout = setTimeout(() => {
           that.setState({classes: classes, style: style, lastVisibility: visible});
         }, this.props.delay);
-        var timeouts = this.state.timeouts.slice()
+        var timeouts = this.state.timeouts.slice();
         timeouts.push(timeout);
-        this.setState({timeouts: timeouts, hasAnimated: true });
+        this.setState({ timeouts: timeouts, hasAnimated: true });
       } else {
         this.setState({classes: classes, style: style, lastVisibility: visible});
       }
@@ -72,42 +86,72 @@ export default class ScrollAnimation extends Component {
     const offset = this.props.offset;
     const elementBottom = this.state.elementBottom;
     const elementTop = this.state.elementTop;
-    const middleOfView = window.scrollY + (window.innerHeight/2);
-    if (elementBottom - elementTop > window.innerHeight - (2*offset)) {
-      const completely = (elementTop < middleOfView + offset && elementBottom > middleOfView - offset);
-      const partially = completely || (((elementTop > middleOfView + offset && elementTop < viewBottom) ||
-          (elementBottom < middleOfView - offset && elementBottom > viewTop)));
-      return {
-        completely: completely,
-        partially: partially
-      }
+    const middleOfView = window.scrollY + (window.innerHeight / 2);
+    let partially;
+    let completely;
+
+    if (elementBottom - elementTop > window.innerHeight - (2 * offset)) {
+      completely = (
+        elementTop < middleOfView + offset &&
+        elementBottom > middleOfView - offset
+      );
+      partially = (
+        completely ||
+        (
+         (elementTop > middleOfView + offset && elementTop < viewBottom) ||
+         (elementBottom < middleOfView - offset && elementBottom > viewTop)
+        )
+      );
+    } else {
+      completely = (
+        (elementBottom < viewBottom - offset && elementBottom > viewTop + offset) &&
+        (elementTop > viewTop + offset && elementTop < viewBottom - offset)
+      );
+      partially = (
+        (elementBottom < viewBottom && elementBottom > viewTop) ||
+        (elementTop > viewTop && elementTop < viewBottom)
+      );
     }
-    return {
-      completely: (elementBottom < viewBottom - offset && elementBottom > viewTop + offset) && (elementTop > viewTop + offset && elementTop < viewBottom - offset),
-      partially: (elementBottom < viewBottom && elementBottom > viewTop) || (elementTop > viewTop && elementTop < viewBottom)
-    };
+    return {completely, partially};
   }
 
   getStyle(visible) {
-    var style = {"animationDuration": this.props.duration + "s"};
+    let style = {
+      animationDuration: `${this.props.duration}s`,
+      opacity: 1
+    };
     if (this.props.animateOnce && this.state.hasAnimated) return style;
     if (!visible.partially && !this.props.initiallyVisible) {
-      style.visibility = "hidden";
-    } else if (!visible.completely &&
-                visible.partially &&
-                !this.state.lastVisibility.partially && !this.props.initiallyVisible) {
-      style.visibility = "hidden";
+      style.opacity = 0;
+      style.visibility = 'hidden';
+    } else if (
+      !visible.completely &&
+      visible.partially &&
+      !this.state.lastVisibility.partially &&
+      !this.props.initiallyVisible
+    ) {
+      style.opacity = 0;
+      style.visibility = 'hidden';
     }
     return style;
   }
 
   getClasses(visible) {
-    var classes = "animated";
+    let classes = 'animated';
     if (this.props.animateOnce && this.state.hasAnimated) return classes;
-    if ((visible.completely && this.props.animateIn) || (visible.partially && this.state.classes.includes(this.props.animateIn) && !this.props.animateOut)) {
-      classes += " " + this.props.animateIn;
-    } else if (visible.partially && this.state.lastVisibility.completely && this.props.animateOut) {
-      classes += " " + this.props.animateOut;
+    if (
+      (this.props.animateIn && visible.completely) ||
+      (
+        (visible.partially && this.state.classes.includes(this.props.animateIn) && !this.props.animateOut)
+      )
+    ) {
+      classes += ` ${this.props.animateIn}`;
+    } else if (
+      visible.partially &&
+      this.state.lastVisibility.completely &&
+      this.props.animateOut
+    ) {
+      classes += ` ${this.props.animateOut}`;
     }
     return classes;
   }
@@ -136,5 +180,6 @@ ScrollAnimation.propTypes = {
   duration: PropTypes.number,
   delay: PropTypes.number,
   initiallyVisible: PropTypes.bool,
-  animateOnce: PropTypes.bool
+  animateOnce: PropTypes.bool,
+  children: PropTypes.node
 };
